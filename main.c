@@ -1,5 +1,6 @@
 #include "raylib.h"
 #include <stdlib.h>
+#include <time.h>
 
 typedef struct {
     int x;
@@ -14,6 +15,10 @@ typedef struct {
     int width;
     int height;
 } Platform;
+
+float rand_float() {
+    return (float) ( (float) rand() / (float) RAND_MAX );
+}
 
 int ball_on_platform( Ball ball, Platform platforms[], int count ) {
     for( int i = 0; i < count; i++ ) {
@@ -40,6 +45,8 @@ int ball_on_platform( Ball ball, Platform platforms[], int count ) {
 }
 
 int main() {
+    srand(time(NULL));
+
     int window_width = 800;
     int window_height = 600;
 
@@ -52,30 +59,65 @@ int main() {
 
     int gravity = 2;
 
-    Platform platforms[3];
+    Vector2 camera_offset = {
+        .x = 0,
+        .y = 0,
+    };
 
+    Vector2 camera_target = {
+        .x = 0,
+        .y = 0,
+    };
+
+    Camera2D camera = {
+        .offset = camera_offset,
+        .target = camera_target,
+        .rotation = 0,
+        .zoom = 1,
+    };
+
+    float platform_spacing = 0.01;
+    int platform_min_y = abs( window_height * 0.2 );
+    int platform_max_y = abs( window_height * 0.8 );
+
+    int world_width = window_width * 10;
+    int platform_width = abs( window_width * 0.3 );
+    int platform_count = world_width / ( platform_width + platform_spacing * window_width );
+
+    Platform platforms[platform_count+1];
+
+    // Create floor
     platforms[0].x = 0;
     platforms[0].y = window_height - 10;
-    platforms[0].width = window_width;
+    platforms[0].width = window_width * 10;
     platforms[0].height = 10;
 
-    platforms[1].x = abs( window_width * 0.1 );
-    platforms[1].y = abs( window_height * 0.7 );
-    platforms[1].width = abs( window_width * 0.3 );
-    platforms[1].height = abs( window_height * 0.05 );
+    int platform_x = abs( window_width * 0.1 );
+    for( int i = 1; i <= platform_count; i++ ) {
+        platforms[i].x = platform_x;
+        platforms[i].y = abs( rand_float() * platform_max_y ) + platform_min_y;
+        platforms[i].width = abs( window_width * 0.3 );
+        platforms[i].height = abs( window_height * 0.05 );
 
-    platforms[2].x = abs( window_width * 0.3 );
-    platforms[2].y = abs( window_height * 0.5 );
-    platforms[2].width = abs( window_width * 0.3 );
-    platforms[2].height = abs( window_height * 0.05 );
-
-    int platform_count = sizeof( platforms ) / sizeof( Platform );
+        platform_x += platforms[i].width + abs( window_width * platform_spacing );
+    }
 
     InitWindow( window_width, window_height, "My Game" );
     SetTargetFPS( 60 );
 
     while( ! WindowShouldClose() ) {
         BeginDrawing();
+        BeginMode2D( camera );
+
+        if( ball.x > window_width * 0.6 ) {
+            camera.offset.x = -(ball.x - window_width * 0.6);
+        } else if( ball.x < window_width * 0.4 ) {
+            camera.offset.x = -(ball.x - window_width * 0.4);
+        }
+
+        if( camera.offset.x > 0 ) {
+            camera.offset.x = 0;
+        }
 
         ball.y += ball.velocity;
         ball.velocity += gravity;
@@ -117,6 +159,7 @@ int main() {
 
         DrawCircle( ball.x, ball.y, ball.size, RED );
 
+        EndMode2D();
         EndDrawing();
     }
 
