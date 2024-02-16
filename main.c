@@ -5,6 +5,18 @@
 #include <math.h>
 
 #define SCALE_FACTOR 1.6
+#define BULLET_SPEED 900
+#define MAX_BULLETS 40
+
+typedef struct {
+    Vector2 position;
+    int size;
+    int direction;
+} Bullet;
+
+void bullet_draw( Bullet *bullet ) {
+    DrawCircleV( bullet->position, bullet->size, YELLOW );
+}
 
 typedef struct {
     Texture2D stand_right;
@@ -15,9 +27,10 @@ typedef struct {
     Texture2D walk1_left;
     Texture2D walk2_right;
     Texture2D walk2_left;
+    Vector2 *gun_position;
 } CharacterImage;
 
-void character_image_load( CharacterImage *character_image, char *standing_image_path, char *jumping_image_path, char *walking_image_path1, char *walking_image_path2 ) {
+void character_image_load( CharacterImage *character_image, char *standing_image_path, char *jumping_image_path, char *walking_image_path1, char *walking_image_path2, Vector2 *gun_position ) {
     Image char_stand_img = LoadImage( standing_image_path );
     Texture2D char_stand_right = LoadTextureFromImage( char_stand_img );
     ImageFlipHorizontal( &char_stand_img );
@@ -50,7 +63,13 @@ void character_image_load( CharacterImage *character_image, char *standing_image
     character_image->walk1_right = char_walk1_right;
     character_image->walk2_left = char_walk2_left;
     character_image->walk2_right = char_walk2_right;
+    character_image->gun_position = gun_position;
 }
+
+typedef struct {
+    Bullet bullets[MAX_BULLETS];
+    int index;
+} Bullets;
 
 typedef struct {
     int x;
@@ -66,7 +85,31 @@ typedef struct {
     CharacterImage image;
     int jump_key;
     bool should_reappear;
+    Bullets *bullets;
 } Character;
+
+void character_shoot( Character *character ) {
+    if( ! character->image.gun_position ) {
+        printf( "ERROR: No gun position set for character\n" );
+        return;
+    }
+
+    printf( "INFO: Shooting bullet\n" );
+
+    int gun_position_x = character->image.gun_position->x;
+    if( character->direction == -1 ) {
+        gun_position_x = character->width - gun_position_x;
+    }
+
+    Bullet bullet = {
+        .position = (Vector2){ character->x + gun_position_x, character->y + character->image.gun_position->y },
+        .direction = character->direction,
+        .size = 15,
+    };
+
+    character->bullets->bullets[character->bullets->index] = bullet;
+    character->bullets->index = (character->bullets->index + 1) % MAX_BULLETS;
+}
 
 void character_destroy( Character *character ) {
     UnloadTexture( character->image.stand_right );
@@ -129,12 +172,19 @@ int main() {
     InitWindow( window_width, window_height, "My Game" );
     SetTargetFPS( 60 );
 
-    CharacterImage character_image;
-    character_image_load( &character_image, "img/standing.png", "img/jumping.png", "img/walk1.png", "img/walk2.png" );
+    bool game_over = false;
 
-    CharacterImage monster_image;
-    character_image_load( &monster_image, "img/monster_right_1.png", "img/monster_right_1.png", "img/monster_right_1.png", "img/monster_right_2.png" );
+    CharacterImage character_image = {0};
+    character_image_load( &character_image, "img/standing.png", "img/jumping.png", "img/walk1.png", "img/walk2.png", NULL );
 
+    CharacterImage monster_image = {0};
+    Vector2 monster_gun_position = {
+        .x = 400,
+        .y = 170,
+    };
+    character_image_load( &monster_image, "img/monster_right_1.png", "img/monster_right_1.png", "img/monster_right_1.png", "img/monster_right_2.png", &monster_gun_position );
+
+    Bullets character_bullets = {0};
     Character character = {
         .x = window_width/2,
         .y = window_height/2,
@@ -149,16 +199,19 @@ int main() {
         .jump_key = KEY_SPACE,
         .direction = 1,
         .should_reappear = false,
+        .bullets = &character_bullets,
     };
+
+    Bullets monster_bullets = {0};
 
     int monster_width = 406;
     Character monster = {
-        .x = window_width,
+        .x = window_width + 500,
         .y = window_height/2,
         .width = monster_width,
         .height = 339,
         .velocity = 200 * SCALE_FACTOR,
-        .speed = 250,
+        .speed = 200,
         .walking = true,
         .jumping = false,
         .jump_strength = 1000,
@@ -166,6 +219,7 @@ int main() {
         .jump_key = KEY_F,
         .direction = -1,
         .should_reappear = true,
+        .bullets = &monster_bullets,
     };
 
     int gravity = 3000 * SCALE_FACTOR;
@@ -254,6 +308,13 @@ int main() {
 
     while( ! WindowShouldClose() ) {
         BeginDrawing();
+
+        if( game_over ) {
+            ClearBackground( RED );
+            DrawText( "Game Over", window_width/2 - 100, window_height/2 - 50, 40, WHITE );
+            EndDrawing();
+            continue;
+        }
 
         float dt = GetFrameTime();
 
@@ -377,6 +438,30 @@ int main() {
             }
 
             DrawTexture( char_texture, characters[i]->x, characters[i]->y, WHITE );
+        }
+
+        if( rand_float() < 0.025 ) {
+            character_shoot( &monster );
+        }
+
+        // Draw bullets
+        for( int j = 0; j < characters_count; j++ ) {
+            for( int i = 0; i < MAX_BULLETS; i++ ) {
+                Bullet *bullet = &characters[j]->bullets->bullets[i];
+                bullet->position.x += bullet->direction * BULLET_SPEED * dt;
+                bullet_draw( bullet );
+
+                Rectangle character_rec = {
+                    .x = character.x,
+                    .y = character.y,
+                    .width = character.width,
+                    .height = character.height,
+                };
+
+                if( CheckCollisionCircleRec( bullet->position, bullet->size, character_rec ) ) {
+                    game_over = true;
+                }
+            }
         }
 
         EndMode2D();
