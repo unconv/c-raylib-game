@@ -7,6 +7,52 @@
 #define SCALE_FACTOR 1.6
 
 typedef struct {
+    Texture2D stand_right;
+    Texture2D stand_left;
+    Texture2D jump_right;
+    Texture2D jump_left;
+    Texture2D walk1_right;
+    Texture2D walk1_left;
+    Texture2D walk2_right;
+    Texture2D walk2_left;
+} CharacterImage;
+
+void character_image_load( CharacterImage *character_image, char *standing_image_path, char *jumping_image_path, char *walking_image_path1, char *walking_image_path2 ) {
+    Image char_stand_img = LoadImage( standing_image_path );
+    Texture2D char_stand_right = LoadTextureFromImage( char_stand_img );
+    ImageFlipHorizontal( &char_stand_img );
+    Texture2D char_stand_left = LoadTextureFromImage( char_stand_img );
+    UnloadImage( char_stand_img );
+
+    Image char_jump_img = LoadImage( jumping_image_path );
+    Texture2D char_jump_right = LoadTextureFromImage( char_jump_img );
+    ImageFlipHorizontal( &char_jump_img );
+    Texture2D char_jump_left = LoadTextureFromImage( char_jump_img );
+    UnloadImage( char_jump_img );
+
+    Image char_walk1_img = LoadImage( walking_image_path1 );
+    Texture2D char_walk1_right = LoadTextureFromImage( char_walk1_img );
+    ImageFlipHorizontal( &char_walk1_img );
+    Texture2D char_walk1_left = LoadTextureFromImage( char_walk1_img );
+    UnloadImage( char_walk1_img );
+
+    Image char_walk2_img = LoadImage( walking_image_path2 );
+    Texture2D char_walk2_right = LoadTextureFromImage( char_walk2_img );
+    ImageFlipHorizontal( &char_walk2_img );
+    Texture2D char_walk2_left = LoadTextureFromImage( char_walk2_img );
+    UnloadImage( char_walk2_img );
+
+    character_image->jump_left = char_jump_left;
+    character_image->jump_right = char_jump_right;
+    character_image->stand_left = char_stand_left;
+    character_image->stand_right = char_stand_right;
+    character_image->walk1_left = char_walk1_left;
+    character_image->walk1_right = char_walk1_right;
+    character_image->walk2_left = char_walk2_left;
+    character_image->walk2_right = char_walk2_right;
+}
+
+typedef struct {
     int x;
     int y;
     int width;
@@ -14,9 +60,24 @@ typedef struct {
     int velocity;
     int direction;
     int speed;
+    int jump_strength;
     bool jumping;
     bool walking;
+    CharacterImage image;
+    int jump_key;
+    bool should_reappear;
 } Character;
+
+void character_destroy( Character *character ) {
+    UnloadTexture( character->image.stand_right );
+    UnloadTexture( character->image.stand_left );
+    UnloadTexture( character->image.jump_right );
+    UnloadTexture( character->image.jump_left );
+    UnloadTexture( character->image.walk1_right );
+    UnloadTexture( character->image.walk1_left );
+    UnloadTexture( character->image.walk2_right );
+    UnloadTexture( character->image.walk2_left );
+}
 
 typedef enum {
     PLATFORM,
@@ -68,18 +129,46 @@ int main() {
     InitWindow( window_width, window_height, "My Game" );
     SetTargetFPS( 60 );
 
+    CharacterImage character_image;
+    character_image_load( &character_image, "img/standing.png", "img/jumping.png", "img/walk1.png", "img/walk2.png" );
+
+    CharacterImage monster_image;
+    character_image_load( &monster_image, "img/monster_right_1.png", "img/monster_right_1.png", "img/monster_right_1.png", "img/monster_right_2.png" );
+
     Character character = {
         .x = window_width/2,
         .y = window_height/2,
         .width = 101,
         .height = 260,
-        .velocity = 4 * SCALE_FACTOR,
-        .speed = 6,
+        .velocity = 200 * SCALE_FACTOR,
+        .speed = 250,
         .walking = false,
         .jumping = false,
+        .jump_strength = 1000,
+        .image = character_image,
+        .jump_key = KEY_SPACE,
+        .direction = 1,
+        .should_reappear = false,
     };
 
-    int gravity = 2 * SCALE_FACTOR;
+    int monster_width = 406;
+    Character monster = {
+        .x = window_width,
+        .y = window_height/2,
+        .width = monster_width,
+        .height = 339,
+        .velocity = 200 * SCALE_FACTOR,
+        .speed = 250,
+        .walking = true,
+        .jumping = false,
+        .jump_strength = 1000,
+        .image = monster_image,
+        .jump_key = KEY_F,
+        .direction = -1,
+        .should_reappear = true,
+    };
+
+    int gravity = 3000 * SCALE_FACTOR;
 
     Vector2 camera_offset = {
         .x = 0,
@@ -160,40 +249,19 @@ int main() {
         platform_x += platforms[i].width + window_width * platform_spacing;
     }
 
-    Image char_stand_img = LoadImage( "img/standing.png" );
-    Texture2D char_stand_right = LoadTextureFromImage( char_stand_img );
-    ImageFlipHorizontal( &char_stand_img );
-    Texture2D char_stand_left = LoadTextureFromImage( char_stand_img );
-    UnloadImage( char_stand_img );
-
-    Image char_jump_img = LoadImage( "img/jumping.png" );
-    Texture2D char_jump_right = LoadTextureFromImage( char_jump_img );
-    ImageFlipHorizontal( &char_jump_img );
-    Texture2D char_jump_left = LoadTextureFromImage( char_jump_img );
-    UnloadImage( char_jump_img );
-
-    Image char_walk1_img = LoadImage( "img/walk1.png" );
-    Texture2D char_walk1_right = LoadTextureFromImage( char_walk1_img );
-    ImageFlipHorizontal( &char_walk1_img );
-    Texture2D char_walk1_left = LoadTextureFromImage( char_walk1_img );
-    UnloadImage( char_walk1_img );
-
-    Image char_walk2_img = LoadImage( "img/walk2.png" );
-    Texture2D char_walk2_right = LoadTextureFromImage( char_walk2_img );
-    ImageFlipHorizontal( &char_walk2_img );
-    Texture2D char_walk2_left = LoadTextureFromImage( char_walk2_img );
-    UnloadImage( char_walk2_img );
+    Character *characters[] = { &character, &monster };
+    int characters_count = 2;
 
     while( ! WindowShouldClose() ) {
         BeginDrawing();
 
-        character.walking = false;
+        float dt = GetFrameTime();
 
-        if( character.x > window_width * 0.6 ) {
-            camera.offset.x = -(character.x - window_width * 0.6);
+        if( character.x > window_width * 0.1 ) {
+            camera.offset.x = -(character.x - window_width * 0.1);
 
-        } else if( character.x < window_width * 0.4 ) {
-            camera.offset.x = -(character.x - window_width * 0.4);
+        } else if( character.x < window_width * 0.05 ) {
+            camera.offset.x = -(character.x - window_width * 0.05);
         }
 
         if( camera.offset.x > 0 ) {
@@ -209,36 +277,40 @@ int main() {
         background_x = -camera.offset.x;
         background_x -= background_x * background_ratio;
 
-        character.y += character.velocity;
-        character.velocity += gravity;
-
-        int current_platform = character_on_platform(
-            character, platforms, platform_count
-        );
-
-        if( current_platform != -1 ) {
-            if( character.velocity > 0 ) {
-                character.y = platforms[current_platform].y - character.height;
-                character.velocity = 0;
-                character.jumping = false;
-            }
-
-            if( IsKeyPressed( KEY_SPACE ) ) {
-                character.velocity = -30 * SCALE_FACTOR;
-                character.jumping = true;
-            }
-        }
-
         if( IsKeyDown( KEY_LEFT ) ) {
             character.walking = true;
-            character.x -= character.speed * SCALE_FACTOR;
             character.direction = -1;
+        } else if( IsKeyDown( KEY_RIGHT ) ) {
+            character.walking = true;
+            character.direction = 1;
+        } else {
+            character.walking = false;
         }
 
-        if( IsKeyDown( KEY_RIGHT ) ) {
-            character.walking = true;
-            character.x += character.speed * SCALE_FACTOR;
-            character.direction = 1;
+        for( int i = 0; i < characters_count; i++ ) {
+            if( characters[i]->walking ) {
+                characters[i]->x += characters[i]->direction * characters[i]->speed * dt * SCALE_FACTOR;
+            }
+
+            characters[i]->y += characters[i]->velocity * dt;
+            characters[i]->velocity += gravity * dt;
+
+            int current_platform = character_on_platform(
+                *(characters[i]), platforms, platform_count
+            );
+
+            if( current_platform != -1 ) {
+                if( characters[i]->velocity > 0 ) {
+                    characters[i]->y = platforms[current_platform].y - characters[i]->height;
+                    characters[i]->velocity = 0;
+                    characters[i]->jumping = false;
+                }
+
+                if( characters[i]->jump_key && IsKeyPressed( characters[i]->jump_key ) ) {
+                    characters[i]->velocity = -characters[i]->jump_strength * SCALE_FACTOR;
+                    characters[i]->jumping = true;
+                }
+            }
         }
 
         ClearBackground( WHITE );
@@ -259,58 +331,60 @@ int main() {
             }
         }
 
-        Texture2D char_texture;
-        if( character.jumping ) {
-            if( character.direction == -1 ) {
-                char_texture = char_jump_left;
-            } else {
-                char_texture = char_jump_right;
-            }
-        } else if( character.walking ) {
-            double time = GetTime() * 10;
-            if( character.direction == -1 ) {
-                if( ((int) time) % 2 == 0 ) {
-                    char_texture = char_walk1_left;
+        for( int i = 0; i < characters_count; i++ ) {
+            Texture2D char_texture;
+            if( characters[i]->jumping ) {
+                if( characters[i]->direction == -1 ) {
+                    char_texture = characters[i]->image.jump_left;
                 } else {
-                    char_texture = char_walk2_left;
+                    char_texture = characters[i]->image.jump_right;
+                }
+            } else if( characters[i]->walking ) {
+                double time = GetTime() * 10;
+                if( characters[i]->direction == -1 ) {
+                    if( ((int) time) % 2 == 0 ) {
+                        char_texture = characters[i]->image.walk1_left;
+                    } else {
+                        char_texture = characters[i]->image.walk2_left;
+                    }
+                } else {
+                    if( ((int) time) % 2 == 0 ) {
+                        char_texture = characters[i]->image.walk1_right;
+                    } else {
+                        char_texture = characters[i]->image.walk2_right;
+                    }
                 }
             } else {
-                if( ((int) time) % 2 == 0 ) {
-                    char_texture = char_walk1_right;
+                if( characters[i]->direction == -1 ) {
+                    char_texture = characters[i]->image.stand_left;
                 } else {
-                    char_texture = char_walk2_right;
+                    char_texture = characters[i]->image.stand_right;
                 }
             }
-        } else {
-            if( character.direction == -1 ) {
-                char_texture = char_stand_left;
+
+            if( characters[i]->should_reappear ) {
+                if( characters[i]->x < -camera.offset.x - 600 ) {
+                    characters[i]->x = -camera.offset.x + window_width;
+                }
             } else {
-                char_texture = char_stand_right;
+                if( characters[i]->x < 0 ) {
+                    characters[i]->x = 0;
+                }
             }
-        }
 
-        if( character.x < 0 ) {
-            character.x = 0;
-        }
+            if( characters[i]->x > world_width - characters[i]->width ) {
+                characters[i]->x = world_width - characters[i]->width;
+            }
 
-        if( character.x > world_width - character.width ) {
-            character.x = world_width - character.width;
+            DrawTexture( char_texture, characters[i]->x, characters[i]->y, WHITE );
         }
-
-        DrawTexture( char_texture, character.x, character.y, WHITE );
 
         EndMode2D();
         EndDrawing();
     }
 
-    UnloadTexture( char_stand_right );
-    UnloadTexture( char_stand_left );
-    UnloadTexture( char_jump_right );
-    UnloadTexture( char_jump_left );
-    UnloadTexture( char_walk1_right );
-    UnloadTexture( char_walk1_left );
-    UnloadTexture( char_walk2_right );
-    UnloadTexture( char_walk2_left );
+    character_destroy( &character );
+    character_destroy( &monster );
     UnloadTexture( floor_piece_texture );
     UnloadTexture( platform1_texture );
     UnloadTexture( platform2_texture );
